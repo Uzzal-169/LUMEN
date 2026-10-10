@@ -1,0 +1,13 @@
+node_modules
+dist
+.venv
+.DS_Store
+*.local
+.vite
+coverage
+video/out
+.env
+cache/
+demo_fixtures/chat.json
+__pycache__/
+*.pyc
