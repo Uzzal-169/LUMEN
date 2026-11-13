@@ -129,6 +129,7 @@ export default function App() {
             <div className="viewport-copy">
               <p className="kicker">Flame in Freefall · SI dashboard</p>
               <h1>How an ISS droplet flame ends.</h1>
+              <p className="steps">Press a recorded test, or move oxygen. Then press Hear this result.</p>
               <p className="lede">
                 Summarizes and ranks PSI-69 burns, then predicts extinction, disruption, or completion. The other
                 investigations in the 2026 statement are listed beside this score and are not in the fit.
@@ -271,7 +272,9 @@ export default function App() {
             </button>
             {locked ? (
               <>
-                <p className="risk risk-locked">Outside the recorded range</p>
+                <p className="risk risk-locked">
+                  {outside.length > 0 ? "Outside the recorded range" : "No gravity in this table"}
+                </p>
                 <h2>Not guessing.</h2>
                 <p className="lock-detail">
                   {gates.map((line) => (
@@ -565,7 +568,8 @@ function spokenResult({
       (name) =>
         `${featureLabel(name)} is ${formatFeature(name, atmosphere[name])}. The table covers ${formatFeature(name, trainingRange[name].min)} to ${formatFeature(name, trainingRange[name].max)}.`,
     );
-    return ["Not guessing.", ...gates, ...limits].join(" ");
+    const heading = outside.length > 0 ? "Outside the recorded range." : "No gravity in this table.";
+    return ["Not guessing.", heading, ...gates, ...limits].join(" ");
   }
   const chances = flexModel.classes
     .map((name) => `${name} ${Math.round(prediction.probabilities[name as Ending] * 100)} percent`)

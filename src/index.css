@@ -181,6 +181,12 @@ h1 {
 
 .viewport .lede { margin: 0; font-size: 0.98rem; }
 
+.steps {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
 .viewport-flame {
   display: grid;
   place-items: center;
