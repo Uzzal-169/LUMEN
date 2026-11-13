@@ -27,7 +27,7 @@ question.
 **Model:** configured in `.env` (`LLM_PROVIDER`, `LLM_MODEL` or `AZURE_OPENAI_DEPLOYMENT`).
 Record the model actually used for the demo here before submission:
 
-- Model: Azure OpenAI deployment `gpt-5.4-mini` (same resource as the DIU Ai Assistant project)
+- Model: Azure OpenAI deployment `gpt-5.4-mini`
 - Provider / endpoint: Azure OpenAI, `api-version=2025-04-01-preview`
 - Date of demo recording: _—_
 

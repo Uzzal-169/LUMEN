@@ -22,7 +22,7 @@ Under the readout, "Ask about this prediction" answers questions about the curre
 - Model configured: `server/index.mjs` calls it with the grounding and caches answers in `cache/`. `npm run freeze` copies cached answers into `demo_fixtures/chat.json` so rehearsed questions answer identically offline.
 
 ```bash
-cp .env.example .env      # Azure GPT-5.4-mini from the DIU Ai Assistant project
+cp .env.example .env      # optional Azure GPT-5.4-mini for Ask
 npm run server            # http://127.0.0.1:8787, proxied as /api by Vite
 npm run dev               # the page
 ```

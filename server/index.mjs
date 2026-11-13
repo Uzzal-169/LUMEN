@@ -96,7 +96,7 @@ function configureProvider() {
   const name = (process.env.LLM_PROVIDER ?? (hasAzureCreds() ? "azure" : "none")).toLowerCase();
 
   if (name === "azure") {
-    // Accept both LUMEN names and the DIU Ai Assistant names (OPENAI_ENDPOINT / OPENAI_KEY / DEPLOYMENT_NAME).
+    // Accept LUMEN names and OPENAI_ENDPOINT / OPENAI_KEY / DEPLOYMENT_NAME.
     const endpoint = (process.env.AZURE_OPENAI_ENDPOINT || process.env.OPENAI_ENDPOINT || "").replace(/\/$/, "");
     const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.DEPLOYMENT_NAME;
     const apiKey = process.env.AZURE_OPENAI_API_KEY || process.env.OPENAI_KEY;
