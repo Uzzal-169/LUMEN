@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Assistant } from "./components/Assistant";
 import { ChallengeBrief } from "./components/ChallengeBrief";
 import { FlameMark } from "./components/FlameMark";
@@ -9,7 +9,7 @@ import {
   type Ending,
   type Fuel,
 } from "./model/flex";
-import { nearest, outOfRange, trainingRange, type NumericFeature } from "./model/neighbors";
+import { nearest, outOfRange, trainingRange, type Neighbor, type NumericFeature } from "./model/neighbors";
 import { FLEX_REPORT_PAGE, REPORTS } from "./model/reports";
 import { StationPanel } from "./components/StationPanel";
 import { ToolBench } from "./components/ToolBench";
@@ -53,6 +53,37 @@ export default function App() {
   const composition =
     atmosphere.oxygen + atmosphere.nitrogen + atmosphere.carbonMonoxide + atmosphere.helium;
   const importance = Object.entries(flexModel.importance).sort((a, b) => b[1] - a[1]);
+  const [hearing, setHearing] = useState(false);
+  const spoken = spokenResult({
+    locked,
+    gates,
+    outside,
+    atmosphere,
+    prediction,
+    nearest: neighbors[0] ?? null,
+  });
+
+  useEffect(() => {
+    window.speechSynthesis?.cancel();
+    setHearing(false);
+  }, [spoken]);
+
+  function hearResult() {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    if (hearing) {
+      synth.cancel();
+      setHearing(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(spoken);
+    utterance.lang = "en-US";
+    utterance.rate = 0.95;
+    utterance.onend = () => setHearing(false);
+    utterance.onerror = () => setHearing(false);
+    setHearing(true);
+    synth.speak(utterance);
+  }
 
   return (
     <div className="console">
@@ -139,6 +170,7 @@ export default function App() {
                   key={preset.id}
                   type="button"
                   className={matched?.id === preset.id ? "preset selected" : "preset"}
+                  aria-pressed={matched?.id === preset.id}
                   onClick={() => setAtmosphere(atmosphereFromPreset(preset))}
                 >
                   <strong>{preset.id}</strong>
@@ -229,6 +261,14 @@ export default function App() {
           <aside className="side">
           <section className="readout" aria-live="polite">
             <p className="card-kicker">Prediction</p>
+            <button
+              type="button"
+              className="hear"
+              aria-pressed={hearing}
+              onClick={hearResult}
+            >
+              {hearing ? "Stop" : "Hear this result"}
+            </button>
             {locked ? (
               <>
                 <p className="risk risk-locked">Outside the recorded range</p>
@@ -431,6 +471,7 @@ function Slider({
         max={max}
         step={step}
         value={value}
+        aria-valuetext={format(value)}
         onChange={(event) => onChange(Number(event.target.value))}
       />
     </label>
@@ -502,6 +543,39 @@ function sameAtmosphere(
     Math.abs(atmosphere.pressureAtm - preset.input.pressureAtm) < 0.011 &&
     Math.abs(atmosphere.diameterMm - preset.input.diameterMm) < 0.011
   );
+}
+
+function spokenResult({
+  locked,
+  gates,
+  outside,
+  atmosphere,
+  prediction,
+  nearest: neighbor,
+}: {
+  locked: boolean;
+  gates: string[];
+  outside: NumericFeature[];
+  atmosphere: Atmosphere;
+  prediction: ReturnType<typeof predict>;
+  nearest: Neighbor | null;
+}): string {
+  if (locked) {
+    const limits = outside.map(
+      (name) =>
+        `${featureLabel(name)} is ${formatFeature(name, atmosphere[name])}. The table covers ${formatFeature(name, trainingRange[name].min)} to ${formatFeature(name, trainingRange[name].max)}.`,
+    );
+    return ["Not guessing.", ...gates, ...limits].join(" ");
+  }
+  const chances = flexModel.classes
+    .map((name) => `${name} ${Math.round(prediction.probabilities[name as Ending] * 100)} percent`)
+    .join(", ");
+  const burn = neighbor
+    ? `Nearest recorded burn ${neighbor.row.id} ${
+        neighbor.row.burnTimeS != null ? `lasted ${neighbor.row.burnTimeS} seconds` : "has no recorded burn time"
+      }. That is that droplet test, not a cabin fire.`
+    : "";
+  return `Prediction: ${prediction.top}. ${ENDING_COPY[prediction.top]} ${chances}. ${burn}`;
 }
 
 function percent(value: number): string {

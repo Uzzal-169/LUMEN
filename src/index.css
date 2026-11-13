@@ -239,6 +239,24 @@ h1 {
 
 .readout h2 { margin: 0 0 12px; font-size: 1.55rem; }
 
+.hear {
+  align-self: flex-start;
+  margin: 0 0 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(20, 148, 230, 0.2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.hear[aria-pressed="true"] { background: rgba(92, 225, 255, 0.32); }
+
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
 .score-card {
   margin-top: auto;
   display: grid;
@@ -557,7 +575,10 @@ footer { padding: 22px 4px 0; font-size: 0.92rem; }
   background: rgba(4, 12, 22, 0.85);
   color: var(--text);
 }
-.assistant-compose input:focus { outline: none; }
+.assistant-compose input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
 .assistant-compose button { color: #041018; background: linear-gradient(180deg, #9cf4ff, #1aa4e8); }
 .assistant-grounding summary { cursor: pointer; color: var(--muted); }
 .assistant-grounding table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
