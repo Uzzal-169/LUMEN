@@ -127,6 +127,105 @@ export default function App() {
             <p className="limit">Screens the air before flight. It does not detect or extinguish a cabin fire.</p>
           </div>
 
+          <form className="controls" onSubmit={(event) => event.preventDefault()}>
+            <div className="controls-head">
+              <h2>Chamber</h2>
+              <p>{flexModel.rowsUsed} usable rows from the PSI-69 experimental table.</p>
+            </div>
+
+            <div className="presets" role="group" aria-label="Recorded FLEX tests">
+              {flexModel.presets.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  className={matched?.id === preset.id ? "preset selected" : "preset"}
+                  onClick={() => setAtmosphere(atmosphereFromPreset(preset))}
+                >
+                  <strong>{preset.id}</strong>
+                  <span>
+                    {preset.fuel} · station recorded {preset.actual}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <fieldset className="choice">
+              <legend>Fuel</legend>
+              <div className="choice-row">
+                {(["Methanol", "Heptane"] as Fuel[]).map((fuel) => (
+                  <button
+                    key={fuel}
+                    type="button"
+                    aria-pressed={atmosphere.fuel === fuel}
+                    onClick={() => setAtmosphere({ ...atmosphere, fuel })}
+                  >
+                    {fuel}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <div className="sliders">
+              <Slider
+                label="Oxygen"
+                value={atmosphere.oxygen}
+                min={0.12}
+                max={0.4}
+                step={0.01}
+                format={(value) => value.toFixed(2)}
+                onChange={(oxygen) => setAtmosphere({ ...atmosphere, oxygen })}
+              />
+              <Slider
+                label="Nitrogen"
+                value={atmosphere.nitrogen}
+                min={0}
+                max={0.9}
+                step={0.01}
+                format={(value) => value.toFixed(2)}
+                onChange={(nitrogen) => setAtmosphere({ ...atmosphere, nitrogen })}
+              />
+              <Slider
+                label="CO column"
+                value={atmosphere.carbonMonoxide}
+                min={0}
+                max={0.7}
+                step={0.01}
+                format={(value) => value.toFixed(2)}
+                onChange={(carbonMonoxide) => setAtmosphere({ ...atmosphere, carbonMonoxide })}
+              />
+              <Slider
+                label="Helium"
+                value={atmosphere.helium}
+                min={0}
+                max={0.45}
+                step={0.01}
+                format={(value) => value.toFixed(2)}
+                onChange={(helium) => setAtmosphere({ ...atmosphere, helium })}
+              />
+              <Slider
+                label="Pressure"
+                value={atmosphere.pressureAtm}
+                min={0.4}
+                max={3.1}
+                step={0.01}
+                format={(value) => `${value.toFixed(2)} atm`}
+                onChange={(pressureAtm) => setAtmosphere({ ...atmosphere, pressureAtm })}
+              />
+              <Slider
+                label="Droplet"
+                value={atmosphere.diameterMm}
+                min={1.1}
+                max={4.7}
+                step={0.01}
+                format={(value) => `${value.toFixed(2)} mm`}
+                onChange={(diameterMm) => setAtmosphere({ ...atmosphere, diameterMm })}
+              />
+            </div>
+            <p className={Math.abs(composition - 1) > 0.05 ? "sum warn" : "sum"}>
+              Mole fractions sum to {composition.toFixed(2)}. Rows in the table sum to about 1.
+            </p>
+          </form>
+
           <aside className="side">
           <section className="readout" aria-live="polite">
             <p className="card-kicker">Prediction</p>
@@ -198,105 +297,6 @@ export default function App() {
         </section>
 
         {placeId === "station" ? <StationPanel atmosphere={atmosphere} locked={locked} /> : null}
-
-        <form className="controls" onSubmit={(event) => event.preventDefault()}>
-          <div className="controls-head">
-            <h2>Chamber</h2>
-            <p>{flexModel.rowsUsed} usable rows from the PSI-69 experimental table.</p>
-          </div>
-
-          <div className="presets" role="group" aria-label="Recorded FLEX tests">
-            {flexModel.presets.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                className={matched?.id === preset.id ? "preset selected" : "preset"}
-                onClick={() => setAtmosphere(atmosphereFromPreset(preset))}
-              >
-                <strong>{preset.id}</strong>
-                <span>
-                  {preset.fuel} · station recorded {preset.actual}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <fieldset className="choice">
-            <legend>Fuel</legend>
-            <div className="choice-row">
-              {(["Methanol", "Heptane"] as Fuel[]).map((fuel) => (
-                <button
-                  key={fuel}
-                  type="button"
-                  aria-pressed={atmosphere.fuel === fuel}
-                  onClick={() => setAtmosphere({ ...atmosphere, fuel })}
-                >
-                  {fuel}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="sliders">
-            <Slider
-              label="Oxygen"
-              value={atmosphere.oxygen}
-              min={0.12}
-              max={0.4}
-              step={0.01}
-              format={(value) => value.toFixed(2)}
-              onChange={(oxygen) => setAtmosphere({ ...atmosphere, oxygen })}
-            />
-            <Slider
-              label="Nitrogen"
-              value={atmosphere.nitrogen}
-              min={0}
-              max={0.9}
-              step={0.01}
-              format={(value) => value.toFixed(2)}
-              onChange={(nitrogen) => setAtmosphere({ ...atmosphere, nitrogen })}
-            />
-            <Slider
-              label="CO column"
-              value={atmosphere.carbonMonoxide}
-              min={0}
-              max={0.7}
-              step={0.01}
-              format={(value) => value.toFixed(2)}
-              onChange={(carbonMonoxide) => setAtmosphere({ ...atmosphere, carbonMonoxide })}
-            />
-            <Slider
-              label="Helium"
-              value={atmosphere.helium}
-              min={0}
-              max={0.45}
-              step={0.01}
-              format={(value) => value.toFixed(2)}
-              onChange={(helium) => setAtmosphere({ ...atmosphere, helium })}
-            />
-            <Slider
-              label="Pressure"
-              value={atmosphere.pressureAtm}
-              min={0.4}
-              max={3.1}
-              step={0.01}
-              format={(value) => `${value.toFixed(2)} atm`}
-              onChange={(pressureAtm) => setAtmosphere({ ...atmosphere, pressureAtm })}
-            />
-            <Slider
-              label="Droplet"
-              value={atmosphere.diameterMm}
-              min={1.1}
-              max={4.7}
-              step={0.01}
-              format={(value) => `${value.toFixed(2)} mm`}
-              onChange={(diameterMm) => setAtmosphere({ ...atmosphere, diameterMm })}
-            />
-          </div>
-          <p className={Math.abs(composition - 1) > 0.05 ? "sum warn" : "sum"}>
-            Mole fractions sum to {composition.toFixed(2)}. Rows in the table sum to about 1.
-          </p>
-        </form>
 
         <section className="band" id="burns" aria-label="Nearest recorded burns">
           <div className="band-head">

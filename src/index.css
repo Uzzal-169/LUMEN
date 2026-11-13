@@ -32,7 +32,7 @@ button, input { font: inherit; color: inherit; }
 a { color: var(--cyan); }
 
 .console {
-  width: min(1280px, calc(100% - 32px));
+  width: min(1560px, calc(100% - 32px));
   margin: 0 auto;
   padding-bottom: 64px;
 }
@@ -137,7 +137,7 @@ a { color: var(--cyan); }
 
 .stage {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.7fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr) minmax(250px, 0.72fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -254,7 +254,10 @@ h1 {
   text-shadow: 0 0 24px rgba(92, 225, 255, 0.35);
 }
 
+.stage .controls { margin-top: 0; height: 100%; }
 .controls { margin-top: 16px; padding: 20px 22px 18px; }
+.stage .presets { grid-template-columns: 1fr; }
+.stage .sliders { grid-template-columns: 1fr; gap: 0; }
 
 .controls-head {
   display: flex;
