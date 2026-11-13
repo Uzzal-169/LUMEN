@@ -1,5 +1,6 @@
 import { flexModel, predict, type Atmosphere, type Ending, type Prediction } from "../model/flex";
 import { endingCounts, nearest, outOfRange, trainingRange, type Neighbor, type NumericFeature } from "../model/neighbors";
+import { REPORTS, type Report } from "../model/reports";
 
 /**
  * Everything the assistant is allowed to talk about. Built deterministically in the
@@ -42,6 +43,8 @@ export interface Grounding {
     classCounts: Record<string, number>;
   };
   importance: Array<{ feature: string; accuracyDrop: number }>;
+  /** The only NTRS reports the assistant is allowed to cite. */
+  reports: Report[];
 }
 
 export interface Counterfactual {
@@ -77,6 +80,7 @@ export function buildGrounding(chamber: Atmosphere, prediction: Prediction): Gro
     importance: Object.entries(flexModel.importance)
       .map(([feature, accuracyDrop]) => ({ feature, accuracyDrop }))
       .sort((a, b) => b.accuracyDrop - a.accuracyDrop),
+    reports: REPORTS,
   };
 }
 

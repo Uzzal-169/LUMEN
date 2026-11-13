@@ -30,7 +30,9 @@ export function answerOffline(question: string, g: Grounding): OfflineAnswer {
   const q = question.toLowerCase();
   const ids = g.neighbors.map((n) => n.id);
 
+  if (intent(q, "reports")) return { text: reportsText(g, lang), citations: g.reports.map((r) => r.ntrsId) };
   if (intent(q, "neighbors")) return { text: neighborsText(g, lang), citations: ids };
+  if (g.outOfRange.length > 0) return { text: lockedText(g, lang), citations: [] };
   if (intent(q, "trust")) return { text: metricsText(g, lang), citations: [] };
   if (intent(q, "oxygen")) return { text: sensitivityText(g, "oxygen", lang), citations: ids.slice(0, 3) };
   if (intent(q, "pressure")) return { text: sensitivityText(g, "pressure", lang), citations: ids.slice(0, 3) };
@@ -43,9 +45,11 @@ export function answerOffline(question: string, g: Grounding): OfflineAnswer {
 
 function intent(
   q: string,
-  kind: "neighbors" | "trust" | "oxygen" | "pressure" | "droplet" | "fuel" | "range" | "importance",
+  kind: "neighbors" | "trust" | "oxygen" | "pressure" | "droplet" | "fuel" | "range" | "importance" | "reports",
 ): boolean {
   const patterns: Record<typeof kind, RegExp> = {
+    reports:
+      /\b(ntrs|report|paper|citation|cite|literature|rank|publication)\b|রিপোর্ট|প্রবন্ধ|পেপার/,
     neighbors:
       /\b(closest|nearest|similar|neighbou?r|experiment|which test|which row|record|kachakachi|kache|kon test|kon row)\b|কাছাকাছি|কোন পরীক্ষা|কোন টেস্ট|কোন রো/,
     trust:
@@ -157,6 +161,22 @@ function sensitivityText(g: Grounding, which: "oxygen" | "pressure" | "droplet" 
       : ` Shuffling ${which} in the training table drops accuracy by ${imp.accuracyDrop.toFixed(3)}.`
     : "";
   return head + tail + impText;
+}
+
+function lockedText(g: Grounding, lang: ReplyLanguage): string {
+  const items = g.outOfRange.map(
+    (r) => `${label(r.feature, lang)} = ${r.value} (${lang === "bn" ? "টেবিল" : "table"} ${r.min}–${r.max})`,
+  );
+  return lang === "bn"
+    ? `রেকর্ড করা রেঞ্জের বাইরে। অনুমান করছি না। ${items.join("; ")}.`
+    : `Outside the recorded range. Not guessing. ${items.join("; ")}.`;
+}
+
+function reportsText(g: Grounding, lang: ReplyLanguage): string {
+  const lines = g.reports.map((r) => `${r.rank}. ${r.ntrsId} ${r.title}`);
+  return lang === "bn"
+    ? `এই অ্যাসিস্ট্যান্ট শুধু এই ${g.reports.length}টা NTRS রিপোর্ট উদ্ধৃত করে, PSI-69 FLEX-এর সাথে মিলিয়ে র‍্যাঙ্ক করা: ${lines.join("; ")}.`
+    : `This assistant cites only these ${g.reports.length} NTRS reports, ranked for the PSI-69 FLEX burns: ${lines.join("; ")}.`;
 }
 
 function rangeText(g: Grounding, lang: ReplyLanguage): string {

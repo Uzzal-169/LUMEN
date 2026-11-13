@@ -13,6 +13,8 @@ describe("grounding", () => {
     expect(grounding.neighbors[0].id).toBe(preset.id);
     expect(grounding.neighbors).toHaveLength(5);
     expect(grounding.outOfRange).toEqual([]);
+    expect(grounding.reports.map((r) => r.ntrsId)).toContain("20150023456");
+    expect(grounding.reports.length).toBeGreaterThanOrEqual(10);
     const oxygenDown = grounding.counterfactuals.find((c) => c.label === "oxygen −0.02");
     expect(oxygenDown?.change.oxygen).toBeCloseTo(0.19, 6);
     expect(oxygenDown?.top).toBe(predict({ ...chamber, oxygen: 0.19 }).top);
@@ -46,12 +48,20 @@ describe("offline explainer", () => {
     expect(text).toMatch(/decision boundary/);
   });
 
-  it("warns when the chamber is outside the table", () => {
+  it("refuses to guess when the chamber is outside the table", () => {
     const wild: Atmosphere = { ...chamber, oxygen: 0.6 };
     const g = buildGrounding(wild, predict(wild));
-    const { text } = answerOffline("Is this inside the range you trained on?", g);
-    expect(text).toMatch(/Caution: oxygen = 0.6/);
-    expect(text).toMatch(/extrapolation/);
+    const { text } = answerOffline("Why does the model predict this ending?", g);
+    expect(text).toMatch(/Outside the recorded range\. Not guessing\./);
+    expect(text).toMatch(/oxygen = 0\.6/);
+    expect(text).not.toMatch(/predicts/);
+  });
+
+  it("cites only the ranked NTRS list", () => {
+    const { text, citations } = answerOffline("Which NTRS reports back this?", grounding);
+    expect(citations).toContain("20150023456");
+    expect(text).toContain("20150023456");
+    expect(text).toMatch(/cites only these/);
   });
 
   it("answers Banglish in Bangla", () => {

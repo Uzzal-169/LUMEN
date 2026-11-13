@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Assistant } from "./components/Assistant";
+import { ChallengeBrief } from "./components/ChallengeBrief";
 import { FlameMark } from "./components/FlameMark";
 import {
   flexModel,
@@ -8,6 +9,19 @@ import {
   type Ending,
   type Fuel,
 } from "./model/flex";
+import { nearest, outOfRange, trainingRange, type NumericFeature } from "./model/neighbors";
+import { FLEX_REPORT_PAGE, REPORTS } from "./model/reports";
+import { StationPanel } from "./components/StationPanel";
+import { ToolBench } from "./components/ToolBench";
+import {
+  ATMOSPHERE_PRESETS,
+  PLACE_USES,
+  contextBlocks,
+  psiToAtm,
+  type AtmospherePreset,
+  type BenchContext,
+  type PlaceUse,
+} from "./model/tools";
 
 const ENDING_COPY: Record<Ending, string> = {
   Extinction: "The visible flame went out.",
@@ -24,73 +38,206 @@ export default function App() {
     atmosphereFromPreset(flexModel.presets[0]),
   );
   const prediction = useMemo(() => predict(atmosphere), [atmosphere]);
+  const outside = useMemo(() => outOfRange(atmosphere), [atmosphere]);
+  const neighbors = useMemo(() => nearest(atmosphere, 5), [atmosphere]);
+  const [placeId, setPlaceId] = useState<PlaceUse>("station");
+  const [context, setContext] = useState<BenchContext>({
+    gravity: "microgravity",
+    temperatureC: 25,
+    airSpeedCmS: 1,
+    sensor: "MDCA",
+  });
+  const gates = useMemo(() => contextBlocks(context), [context]);
+  const locked = outside.length > 0 || gates.length > 0;
   const matched = flexModel.presets.find((preset) => sameAtmosphere(atmosphere, preset));
   const composition =
     atmosphere.oxygen + atmosphere.nitrogen + atmosphere.carbonMonoxide + atmosphere.helium;
   const importance = Object.entries(flexModel.importance).sort((a, b) => b[1] - a[1]);
 
   return (
-    <div className="page">
+    <div className="console">
       <header className="topbar">
         <a className="brand" href="#lab">
           <span className="brand-mark" aria-hidden="true" />
           LUMEN
         </a>
-        <p className="team">DIU Smart X · Dhaka · Space Apps 2026</p>
+        <nav className="nav" aria-label="Sections">
+          <a className="nav-pill" href="#lab">Chamber</a>
+          <a href="#burns">Burns</a>
+          <a href="#ask">Ask</a>
+          <a href="#brief">Brief</a>
+          <a href="#tools">Tools</a>
+          <a href="#reports">Reports</a>
+        </nav>
+        <p className="status">
+          <span className="status-dot" aria-hidden="true" />
+          PSI-69 · local model
+        </p>
       </header>
 
+      <div className="place-bar">
+        <nav className="nav" aria-label="Habitable place">
+          {PLACE_USES.map((place) => (
+            <button
+              key={place.id}
+              type="button"
+              className={place.id === placeId ? "nav-pill" : ""}
+              aria-pressed={place.id === placeId}
+              onClick={() => selectPlace(place.id, setPlaceId, setAtmosphere, setContext)}
+            >
+              {place.label}
+            </button>
+          ))}
+        </nav>
+        <p className="place-job">{PLACE_USES.find((place) => place.id === placeId)?.job}</p>
+      </div>
+
       <main>
-        <section className="hero">
-          <p className="kicker">Flame in Freefall · PSI-69</p>
-          <h1>How an ISS droplet flame ends, learned from the FLEX table.</h1>
-          <p className="lede">
-            The model is a gradient-boosted classifier trained on the Flame
-            Extinguishment Experiment table in NASA’s Physical Sciences Informatics
-            repository, the combustion archive listed on data.nasa.gov. It reads the
-            chamber atmosphere and predicts whether that burn ended in extinction,
-            disruption, or completion.
-          </p>
+        <section className="stage" id="lab">
+          <div className="viewport">
+            <div className="viewport-copy">
+              <p className="kicker">Flame in Freefall · SI dashboard</p>
+              <h1>How an ISS droplet flame ends.</h1>
+              <p className="lede">
+                Summarizes and ranks PSI-69 burns, then predicts extinction, disruption, or completion. The other
+                investigations in the 2026 statement are listed beside this score and are not in the fit.
+              </p>
+            </div>
+            <div className="viewport-flame">
+              <FlameMark atmosphere={atmosphere} prediction={prediction} locked={locked} />
+            </div>
+            <ul className="telemetry">
+              <li>
+                <span>Oxygen</span>
+                <strong>{atmosphere.oxygen.toFixed(2)}</strong>
+              </li>
+              <li>
+                <span>Pressure</span>
+                <strong>{atmosphere.pressureAtm.toFixed(2)} atm</strong>
+              </li>
+              <li>
+                <span>Droplet</span>
+                <strong>{atmosphere.diameterMm.toFixed(2)} mm</strong>
+              </li>
+              <li>
+                <span>Fuel</span>
+                <strong>{atmosphere.fuel}</strong>
+              </li>
+            </ul>
+            <p className="limit">Screens the air before flight. It does not detect or extinguish a cabin fire.</p>
+          </div>
+
+          <aside className="side">
+          <section className="readout" aria-live="polite">
+            <p className="card-kicker">Prediction</p>
+            {locked ? (
+              <>
+                <p className="risk risk-locked">Outside the recorded range</p>
+                <h2>Not guessing.</h2>
+                <p className="lock-detail">
+                  {gates.map((line) => (
+                    <span key={line}>{line}</span>
+                  ))}
+                  {outside.map((name) => (
+                    <span key={name}>
+                      {featureLabel(name)} is {formatFeature(name, atmosphere[name])}. The table covers{" "}
+                      {formatFeature(name, trainingRange[name].min)} to {formatFeature(name, trainingRange[name].max)}.
+                    </span>
+                  ))}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className={`risk risk-${prediction.top.toLowerCase()}`}>{prediction.top}</p>
+                <h2>{ENDING_COPY[prediction.top]}</h2>
+                {matched ? (
+                  <p className="match">
+                    PSI row {matched.id} actually ended in {matched.actual}.
+                  </p>
+                ) : null}
+                <ul className="probs">
+                  {flexModel.classes.map((name) => {
+                    const ending = name as Ending;
+                    const probability = prediction.probabilities[ending];
+                    return (
+                      <li key={name}>
+                        <span>
+                          {name}
+                          <b>{Math.round(probability * 100)}%</b>
+                        </span>
+                        <span className="bar">
+                          <span style={{ width: `${probability * 100}%` }} />
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="uncertainty">
+                  Completion has {flexModel.metrics.classCounts.Completion} rows and recall of{" "}
+                  {percent(flexModel.metrics.recall.Completion)}. Extinction is the confident class: recall{" "}
+                  {percent(flexModel.metrics.recall.Extinction)}.
+                </p>
+              </>
+            )}
+            {neighbors[0] ? (
+              <p className="match">
+                Nearest recorded burn {neighbors[0].row.id}{" "}
+                {neighbors[0].row.burnTimeS != null
+                  ? `lasted ${neighbors[0].row.burnTimeS} s`
+                  : "has no recorded burn time"}
+                . That is that droplet test, not a cabin fire.
+              </p>
+            ) : null}
+            <article className="score-card">
+              <span>Five-fold accuracy</span>
+              <strong>{percent(flexModel.metrics.accuracy)}</strong>
+              <span>Always guessing {flexModel.metrics.majorityClass.toLowerCase()} scores {percent(flexModel.metrics.majorityAccuracy)}</span>
+            </article>
+          </section>
+          </aside>
         </section>
 
-        <section className="lab" id="lab">
-          <form className="controls" onSubmit={(event) => event.preventDefault()}>
-            <div className="controls-head">
-              <h2>Chamber</h2>
-              <p>{flexModel.rowsUsed} usable rows from the PSI-69 experimental table.</p>
-            </div>
+        {placeId === "station" ? <StationPanel atmosphere={atmosphere} locked={locked} /> : null}
 
-            <div className="presets" role="group" aria-label="Recorded FLEX tests">
-              {flexModel.presets.map((preset) => (
+        <form className="controls" onSubmit={(event) => event.preventDefault()}>
+          <div className="controls-head">
+            <h2>Chamber</h2>
+            <p>{flexModel.rowsUsed} usable rows from the PSI-69 experimental table.</p>
+          </div>
+
+          <div className="presets" role="group" aria-label="Recorded FLEX tests">
+            {flexModel.presets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={matched?.id === preset.id ? "preset selected" : "preset"}
+                onClick={() => setAtmosphere(atmosphereFromPreset(preset))}
+              >
+                <strong>{preset.id}</strong>
+                <span>
+                  {preset.fuel} · station recorded {preset.actual}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <fieldset className="choice">
+            <legend>Fuel</legend>
+            <div className="choice-row">
+              {(["Methanol", "Heptane"] as Fuel[]).map((fuel) => (
                 <button
-                  key={preset.id}
+                  key={fuel}
                   type="button"
-                  className={matched?.id === preset.id ? "preset selected" : "preset"}
-                  onClick={() => setAtmosphere(atmosphereFromPreset(preset))}
+                  aria-pressed={atmosphere.fuel === fuel}
+                  onClick={() => setAtmosphere({ ...atmosphere, fuel })}
                 >
-                  <strong>{preset.id}</strong>
-                  <span>
-                    {preset.fuel} · station recorded {preset.actual}
-                  </span>
+                  {fuel}
                 </button>
               ))}
             </div>
+          </fieldset>
 
-            <fieldset className="choice">
-              <legend>Fuel</legend>
-              <div className="choice-row">
-                {(["Methanol", "Heptane"] as Fuel[]).map((fuel) => (
-                  <button
-                    key={fuel}
-                    type="button"
-                    aria-pressed={atmosphere.fuel === fuel}
-                    onClick={() => setAtmosphere({ ...atmosphere, fuel })}
-                  >
-                    {fuel}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
+          <div className="sliders">
             <Slider
               label="Oxygen"
               value={atmosphere.oxygen}
@@ -127,9 +274,6 @@ export default function App() {
               format={(value) => value.toFixed(2)}
               onChange={(helium) => setAtmosphere({ ...atmosphere, helium })}
             />
-            <p className={Math.abs(composition - 1) > 0.05 ? "sum warn" : "sum"}>
-              Mole fractions sum to {composition.toFixed(2)}. Rows in the table sum to about 1.
-            </p>
             <Slider
               label="Pressure"
               value={atmosphere.pressureAtm}
@@ -148,39 +292,47 @@ export default function App() {
               format={(value) => `${value.toFixed(2)} mm`}
               onChange={(diameterMm) => setAtmosphere({ ...atmosphere, diameterMm })}
             />
-          </form>
+          </div>
+          <p className={Math.abs(composition - 1) > 0.05 ? "sum warn" : "sum"}>
+            Mole fractions sum to {composition.toFixed(2)}. Rows in the table sum to about 1.
+          </p>
+        </form>
 
-          <section className="readout" aria-live="polite">
-            <FlameMark atmosphere={atmosphere} prediction={prediction} />
-            <p className={`risk risk-${prediction.top.toLowerCase()}`}>{prediction.top}</p>
-            <h2>{ENDING_COPY[prediction.top]}</h2>
-            {matched ? (
-              <p className="match">
-                PSI row {matched.id} actually ended in {matched.actual}.
-              </p>
-            ) : null}
-            <ul className="probs">
-              {flexModel.classes.map((name) => {
-                const ending = name as Ending;
-                const probability = prediction.probabilities[ending];
-                return (
-                  <li key={name}>
-                    <span>
-                      {name}
-                      <b>{Math.round(probability * 100)}%</b>
-                    </span>
-                    <span className="bar">
-                      <span style={{ width: `${probability * 100}%` }} />
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+        <section className="band" id="burns" aria-label="Nearest recorded burns">
+          <div className="band-head">
+            <h2>Nearest recorded burns</h2>
+            <p>Each card opens the FLEX results report on NTRS. These rows have no page of their own.</p>
+          </div>
+          <ul className="neighbors">
+            {neighbors.map(({ row }) => (
+              <li key={row.id}>
+                <a href={FLEX_REPORT_PAGE} target="_blank" rel="noreferrer">
+                  <strong>{row.id}</strong>
+                  <span>
+                    {row.fuel} · O₂ {row.oxygen.toFixed(2)} · {row.pressureAtm.toFixed(2)} atm
+                  </span>
+                  <span className={`ending ending-${row.ending.toLowerCase()}`}>Recorded {row.ending}</span>
+                  <span>{row.burnTimeS != null ? `${row.burnTimeS} s recorded` : "Burn time not recorded"}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </section>
 
-        <Assistant atmosphere={atmosphere} prediction={prediction} />
+        <div id="ask">
+          <Assistant atmosphere={atmosphere} prediction={prediction} hold={gates[0] ?? null} />
+        </div>
 
+        <ToolBench
+          context={context}
+          onContext={setContext}
+          onApply={(preset) => applyPreset(preset, setAtmosphere, setContext)}
+          locked={locked}
+          ending={prediction.top}
+          nearestId={neighbors[0]?.row.id}
+        />
+
+        <div className="facts">
         <section className="notes">
           <h2>Held-out score</h2>
           <ul>
@@ -202,6 +354,27 @@ export default function App() {
           </ul>
         </section>
 
+        <ChallengeBrief />
+
+        <section className="reports" id="reports">
+          <h2>Ranked NTRS reports</h2>
+          <p className="lede">
+            The assistant cites only this list. Each report documents the FLEX droplet burns or the extinction physics
+            in the PSI-69 table.
+          </p>
+          <ol className="report-list">
+            {REPORTS.map((report) => (
+              <li key={report.ntrsId}>
+                <a href={report.url} target="_blank" rel="noreferrer">
+                  <strong>{report.ntrsId}</strong>
+                  <span>{report.title}</span>
+                </a>
+                <p>{report.note}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         <section className="sources">
           <h2>What the model uses</h2>
           <div className="source-grid">
@@ -213,17 +386,14 @@ export default function App() {
             ))}
           </div>
         </section>
+        </div>
       </main>
 
       <footer>
         <p>
           Training file: PSI-69 experimental table ·{" "}
-          <a
-            href="https://psi.nasa.gov/physci/repo/data/investigations/PSI-69"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Flame Extinguishment Experiment
+          <a href={FLEX_REPORT_PAGE} target="_blank" rel="noreferrer">
+            Flame Extinguishment Experiment results
           </a>
           . The repository is the Physical Sciences Informatics record on data.nasa.gov.
         </p>
@@ -267,6 +437,58 @@ function Slider({
   );
 }
 
+function selectPlace(
+  id: PlaceUse,
+  setPlaceId: (id: PlaceUse) => void,
+  setAtmosphere: (value: Atmosphere | ((current: Atmosphere) => Atmosphere)) => void,
+  setContext: (value: BenchContext | ((current: BenchContext) => BenchContext)) => void,
+) {
+  const place = PLACE_USES.find((item) => item.id === id) ?? PLACE_USES[1];
+  setPlaceId(place.id);
+  setContext((current) => ({ ...current, gravity: place.gravity }));
+  if (id === "spacecraft") {
+    setAtmosphere((current) => ({
+      ...current,
+      oxygen: 0.21,
+      nitrogen: 0.79,
+      carbonMonoxide: 0,
+      helium: 0,
+      pressureAtm: 1,
+    }));
+  }
+  if (id === "station") {
+    setAtmosphere(atmosphereFromPreset(flexModel.presets[0]));
+  }
+  if (id === "surface" || id === "rover") {
+    const moon = ATMOSPHERE_PRESETS.find((item) => item.id === "moon");
+    if (!moon) return;
+    setAtmosphere((current) => ({
+      ...current,
+      oxygen: moon.oxygen,
+      nitrogen: moon.nitrogen,
+      carbonMonoxide: moon.carbonMonoxide,
+      helium: moon.helium,
+      pressureAtm: Number(psiToAtm(moon.psi).toFixed(4)),
+    }));
+  }
+}
+
+function applyPreset(
+  preset: AtmospherePreset,
+  setAtmosphere: (value: Atmosphere | ((current: Atmosphere) => Atmosphere)) => void,
+  setContext: (value: BenchContext | ((current: BenchContext) => BenchContext)) => void,
+) {
+  setAtmosphere((current) => ({
+    ...current,
+    oxygen: preset.oxygen,
+    nitrogen: preset.nitrogen,
+    carbonMonoxide: preset.carbonMonoxide,
+    helium: preset.helium,
+    pressureAtm: Number(psiToAtm(preset.psi).toFixed(4)),
+  }));
+  setContext((current) => ({ ...current, gravity: preset.gravity }));
+}
+
 function sameAtmosphere(
   atmosphere: Atmosphere,
   preset: (typeof flexModel.presets)[number],
@@ -284,6 +506,12 @@ function sameAtmosphere(
 
 function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatFeature(name: NumericFeature, value: number): string {
+  if (name === "pressureAtm") return `${value.toFixed(2)} atm`;
+  if (name === "diameterMm") return `${value.toFixed(2)} mm`;
+  return value.toFixed(2);
 }
 
 function featureLabel(name: string): string {

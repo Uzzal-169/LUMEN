@@ -5,14 +5,21 @@ import { FlameCanvas } from "./FlameCanvas";
 export function FlameMark({
   atmosphere,
   prediction,
+  locked = false,
 }: {
   atmosphere: Atmosphere;
   prediction: Prediction;
+  locked?: boolean;
 }) {
   const [inspect, setInspect] = useState(false);
   const ending = prediction.top;
-  const caption =
-    ending === "Extinction" ? "Flame dying" : ending === "Disruption" ? "Droplet splitting" : "Flame holding";
+  const caption = locked
+    ? "Outside the recorded range"
+    : ending === "Extinction"
+      ? "Flame dying"
+      : ending === "Disruption"
+        ? "Droplet splitting"
+        : "Flame holding";
   const colour =
     atmosphere.fuel === "Heptane"
       ? "Heptane · sooty yellow-orange (FLEX)"

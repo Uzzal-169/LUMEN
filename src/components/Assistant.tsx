@@ -18,6 +18,7 @@ const SUGGESTIONS = [
   "What happens if oxygen drops by 2%?",
   "Which recorded experiments are closest?",
   "How much should I trust this?",
+  "Which NTRS reports back this?",
 ];
 
 const SOURCE_LABEL: Record<NonNullable<Message["source"]>, string> = {
@@ -26,7 +27,15 @@ const SOURCE_LABEL: Record<NonNullable<Message["source"]>, string> = {
   offline: "computed from the table",
 };
 
-export function Assistant({ atmosphere, prediction }: { atmosphere: Atmosphere; prediction: Prediction }) {
+export function Assistant({
+  atmosphere,
+  prediction,
+  hold = null,
+}: {
+  atmosphere: Atmosphere;
+  prediction: Prediction;
+  hold?: string | null;
+}) {
   const grounding = useMemo(() => buildGrounding(atmosphere, prediction), [atmosphere, prediction]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -44,6 +53,19 @@ export function Assistant({ atmosphere, prediction }: { atmosphere: Atmosphere; 
     const history: HistoryTurn[] = messages.map((m) => ({ role: m.role, content: m.text }));
     setMessages((list) => [...list, { id: nextId.current++, role: "user", text: trimmed }]);
     setDraft("");
+    if (hold) {
+      setMessages((list) => [
+        ...list,
+        {
+          id: nextId.current++,
+          role: "assistant",
+          text: hold,
+          source: "offline",
+          note: "Gravity is outside the FLEX table, so no prediction is sent.",
+        },
+      ]);
+      return;
+    }
     setBusy(true);
     try {
       const answer = await ask(trimmed, grounding, history);
@@ -76,18 +98,20 @@ export function Assistant({ atmosphere, prediction }: { atmosphere: Atmosphere; 
       <div className="assistant-head">
         <h2>Ask about this prediction</h2>
         <p>
-          Answers are limited to the model output, the {grounding.neighbors.length} nearest PSI-69 burns, and the
-          held-out score. The language model explains; it never computes a number.
+          Answers use the model output, the {grounding.neighbors.length} nearest PSI-69 burns, the held-out score,
+          and the {grounding.reports.length} ranked NTRS reports. Nothing else. The language model explains; it never
+          computes a number.
         </p>
       </div>
 
       <ol className="assistant-log" ref={logRef} aria-live="polite">
         {messages.length === 0 ? (
           <li className="assistant-empty">
-            Current grounding: {grounding.prediction.top.toLowerCase()} at{" "}
-            {Math.round(grounding.prediction.probabilities[grounding.prediction.top] * 100)}%, nearest test{" "}
-            {grounding.neighbors[0]?.id}
-            {grounding.outOfRange.length > 0 ? ", chamber outside the recorded range" : ""}.
+            {hold
+              ? hold
+              : grounding.outOfRange.length > 0
+              ? "Outside the recorded range. Not guessing."
+              : `Current grounding: ${grounding.prediction.top.toLowerCase()} at ${Math.round(grounding.prediction.probabilities[grounding.prediction.top] * 100)}%, nearest test ${grounding.neighbors[0]?.id}.`}
           </li>
         ) : null}
         {messages.map((message) => (
@@ -136,7 +160,7 @@ export function Assistant({ atmosphere, prediction }: { atmosphere: Atmosphere; 
           type="text"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Ask Your Assistant"
+          placeholder="Tell me what you want to know…"
           aria-label="Question"
           disabled={busy}
         />
@@ -175,7 +199,8 @@ export function Assistant({ atmosphere, prediction }: { atmosphere: Atmosphere; 
         </table>
         <p>
           Plus the current probabilities, {grounding.counterfactuals.length} model evaluations at nearby chambers, the
-          held-out metrics, and the permutation importance. Nothing else.
+          held-out metrics, the permutation importance, and the {grounding.reports.length} ranked NTRS reports. Nothing
+          else.
         </p>
       </details>
     </section>
